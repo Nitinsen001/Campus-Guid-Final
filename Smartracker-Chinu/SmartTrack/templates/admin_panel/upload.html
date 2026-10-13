@@ -1,0 +1,238 @@
+{% extends 'admin_panel/base.html' %}
+{% block title %}Bulk Upload — SmartTrack Admin{% endblock %}
+{% block topbar_title %}Bulk Upload{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>📁 Bulk Upload Timetable</h1>
+        <p>Upload an Excel file to replace or update the entire timetable</p>
+    </div>
+</div>
+
+<div style="display:grid; grid-template-columns: 1fr 360px; gap:20px; align-items:start">
+
+<!-- UPLOAD CARD -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title"><i class="fas fa-file-excel" style="color:#22c55e"></i> Upload Excel File</div>
+    </div>
+
+    <!-- DROP ZONE -->
+    <div id="drop-zone"
+         style="border: 2px dashed var(--border); border-radius:12px; padding:50px 20px; text-align:center;
+                cursor:pointer; transition: all 0.2s; margin-bottom:20px; position:relative">
+        <i class="fas fa-cloud-upload-alt" style="font-size:2.5rem; color:var(--text-muted); margin-bottom:12px; display:block"></i>
+        <div style="font-weight:600; margin-bottom:4px">Drag & drop your Excel file here</div>
+        <div style="font-size:0.8rem; color:var(--text-muted)">or click to browse (.xlsx, .xls)</div>
+        <input type="file" id="file-input" accept=".xlsx,.xls"
+               style="position:absolute;inset:0;opacity:0;cursor:pointer">
+    </div>
+
+    <div id="file-info" style="display:none; margin-bottom:16px">
+        <div class="alert alert-info">
+            <i class="fas fa-file-excel"></i>
+            <span id="file-name-display">file.xlsx</span>
+            <button onclick="clearFile()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:inherit;font-size:1rem">✕</button>
+        </div>
+    </div>
+
+    <!-- OPTIONS -->
+    <div class="form-group" style="margin-bottom:16px">
+        <label>Upload Mode</label>
+        <select id="upload-mode">
+            <option value="false">Append — Add to existing data (skip overlaps)</option>
+            <option value="true">Replace — Delete all existing data first</option>
+        </select>
+    </div>
+
+    <!-- PROGRESS -->
+    <div id="upload-progress" style="display:none; margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-secondary);margin-bottom:6px">
+            <span>Uploading and processing…</span>
+            <span id="progress-pct">0%</span>
+        </div>
+        <div style="background:var(--bg-hover);border-radius:99px;height:6px;overflow:hidden">
+            <div id="progress-fill" style="height:100%;background:linear-gradient(90deg,#2563eb,#a855f7);
+                 border-radius:99px;transition:width 0.3s;width:0%"></div>
+        </div>
+    </div>
+
+    <button id="upload-btn" class="btn btn-success" onclick="startUpload()" disabled style="width:100%;justify-content:center">
+        <i class="fas fa-upload"></i> Upload & Process
+    </button>
+
+    <!-- RESULT -->
+    <div id="upload-result" style="margin-top:16px;display:none"></div>
+</div>
+
+<!-- GUIDE CARD -->
+<div style="display:flex;flex-direction:column;gap:16px">
+    <div class="card">
+        <div class="card-title" style="margin-bottom:12px">📋 Required Column Names</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+            {% for col, desc in required_cols.items %}
+            <div style="display:flex;align-items:center;gap:10px">
+                <code style="background:var(--bg-hover);padding:2px 8px;border-radius:4px;font-size:0.78rem;white-space:nowrap">{{ col }}</code>
+                <span style="font-size:0.8rem;color:var(--text-secondary)">{{ desc }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title" style="margin-bottom:12px">💡 Tips</div>
+        <ul style="display:flex;flex-direction:column;gap:8px;font-size:0.82rem;color:var(--text-secondary);list-style:none">
+            <li>✅ Column names are case-insensitive</li>
+            <li>✅ Accepts "Teacher Guardian", "Teacher", "Faculty" for name</li>
+            <li>✅ Time format: <code style="background:var(--bg-hover);padding:1px 6px;border-radius:4px">09:00-10:00</code> or <code style="background:var(--bg-hover);padding:1px 6px;border-radius:4px">09:00</code></li>
+            <li>✅ Day: Monday, Mon, or 0</li>
+            <li>✅ New faculty are auto-created</li>
+            <li>⚠️ Replace mode deletes ALL existing entries</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <div class="card-title" style="margin-bottom:12px">📊 Current Stats</div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:0.88rem">
+            <div style="display:flex;justify-content:space-between">
+                <span style="color:var(--text-secondary)">Total Faculty</span>
+                <strong id="stat-faculty">{{ faculties|length }}</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between">
+                <span style="color:var(--text-secondary)">Timetable Entries</span>
+                <strong id="stat-entries">Loading…</strong>
+            </div>
+        </div>
+    </div>
+</div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Extend base context with our data
+const REQUIRED_COLS = {
+    'Teacher Guardian': 'Faculty name (required)',
+    'Room No': 'Room number (required)',
+    'Day': 'Day name or number (required)',
+    'Time': 'Time or range e.g. 09:00-10:00 (required)',
+    'Subject': 'Subject name (optional)',
+    'Course': 'Course e.g. B.E. (optional)',
+    'Year': 'Student year (optional)',
+    'Semester': 'Semester number (optional)',
+    'Branch': 'Branch e.g. CSE (optional)',
+};
+
+// Render required column guide
+const guideContainer = document.querySelector('.card:first-of-type .card-title + div') || null;
+
+let selectedFile = null;
+
+// Drop zone
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = '#60a5fa'; dropZone.style.background = 'rgba(96,165,250,0.05)'; });
+dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = ''; dropZone.style.background = ''; });
+dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.style.borderColor = ''; dropZone.style.background = '';
+    handleFile(e.dataTransfer.files[0]);
+});
+document.getElementById('file-input').addEventListener('change', e => handleFile(e.target.files[0]));
+
+function handleFile(file) {
+    if (!file) return;
+    if (!file.name.match(/\.(xlsx|xls)$/i)) {
+        showToast('Please select an Excel file (.xlsx or .xls)', 'error');
+        return;
+    }
+    selectedFile = file;
+    document.getElementById('file-name-display').textContent = `${file.name} (${(file.size/1024).toFixed(0)} KB)`;
+    document.getElementById('file-info').style.display = 'block';
+    document.getElementById('upload-btn').disabled = false;
+    dropZone.style.borderColor = '#22c55e';
+}
+
+function clearFile() {
+    selectedFile = null;
+    document.getElementById('file-info').style.display = 'none';
+    document.getElementById('upload-btn').disabled = true;
+    document.getElementById('file-input').value = '';
+    dropZone.style.borderColor = '';
+}
+
+async function startUpload() {
+    if (!selectedFile) return;
+    const replace = document.getElementById('upload-mode').value;
+    const fd = new FormData();
+    fd.append('file', selectedFile);
+    fd.append('replace', replace);
+
+    document.getElementById('upload-btn').disabled = true;
+    document.getElementById('upload-progress').style.display = 'block';
+    document.getElementById('upload-result').style.display = 'none';
+
+    // Fake progress animation
+    let pct = 0;
+    const pctEl = document.getElementById('progress-pct');
+    const fillEl = document.getElementById('progress-fill');
+    const timer = setInterval(() => {
+        if (pct < 85) { pct += 5; pctEl.textContent = pct + '%'; fillEl.style.width = pct + '%'; }
+    }, 200);
+
+    try {
+        const res = await fetch('/api/timetable/upload/', {
+            method: 'POST',
+            headers: {'X-CSRFToken': getCookie('csrftoken')},
+            body: fd,
+        });
+        clearInterval(timer);
+        pctEl.textContent = '100%'; fillEl.style.width = '100%';
+
+        const data = await res.json();
+        const resultEl = document.getElementById('upload-result');
+        resultEl.style.display = 'block';
+
+        if (res.ok) {
+            resultEl.innerHTML = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i>
+                    <div>
+                        <strong>Upload Successful!</strong><br>
+                        Created: <strong>${data.created}</strong> entries,
+                        Skipped: <strong>${data.skipped}</strong>
+                        ${data.errors.length ? `<br><small style="color:var(--warning)">${data.errors.length} warnings</small>` : ''}
+                    </div>
+                </div>
+                ${data.errors.length ? `<div class="card" style="margin-top:12px;max-height:200px;overflow-y:auto">
+                    <div style="font-size:0.78rem;font-weight:600;margin-bottom:8px">⚠️ Warnings</div>
+                    ${data.errors.map(e => `<div style="font-size:0.78rem;color:var(--warning);padding:3px 0">${e}</div>`).join('')}
+                </div>` : ''}
+            `;
+            showToast(`Uploaded! ${data.created} entries created.`, 'success');
+            // Refresh stats
+            fetch('/api/stats/').then(r=>r.json()).then(s=>{ document.getElementById('stat-entries').textContent = s.total_entries; });
+        } else {
+            resultEl.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <div><strong>Upload Failed</strong><br>${data.error}</div>
+                </div>`;
+            showToast('Upload failed: ' + data.error, 'error', 6000);
+        }
+    } catch (err) {
+        clearInterval(timer);
+        showToast('Network error: ' + err.message, 'error');
+    } finally {
+        document.getElementById('upload-btn').disabled = false;
+        document.getElementById('upload-progress').style.display = 'none';
+    }
+}
+
+// Load stats
+fetch('/api/stats/').then(r=>r.json()).then(s=>{
+    document.getElementById('stat-entries').textContent = s.total_entries;
+});
+</script>
+{% endblock %}

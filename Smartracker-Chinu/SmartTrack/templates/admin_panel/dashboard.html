@@ -1,0 +1,126 @@
+{% extends 'admin_panel/base.html' %}
+{% block title %}Dashboard — SmartTrack Admin{% endblock %}
+{% block topbar_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>📊 Dashboard</h1>
+        <p>Overview of the faculty locator system — <strong>{{ current_day }}, {{ current_time }}</strong></p>
+    </div>
+    <a href="{% url 'admin_upload' %}" class="btn btn-primary">
+        <i class="fas fa-upload"></i> Upload Timetable
+    </a>
+</div>
+
+<!-- STAT CARDS -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(96,165,250,0.12);">👨‍🏫</div>
+        <div class="stat-value" style="color:#60a5fa">{{ total_faculty }}</div>
+        <div class="stat-label">Total Faculty</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(168,85,247,0.12);">🏫</div>
+        <div class="stat-value" style="color:#a855f7">{{ total_rooms }}</div>
+        <div class="stat-label">Unique Rooms</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(245,158,11,0.12);">📅</div>
+        <div class="stat-value" style="color:#f59e0b">{{ total_entries }}</div>
+        <div class="stat-label">Timetable Entries</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(34,197,94,0.12);">✅</div>
+        <div class="stat-value" style="color:#22c55e">{{ active_count }}</div>
+        <div class="stat-label">Currently Active</div>
+    </div>
+</div>
+
+<!-- ACTIVE SESSIONS TABLE -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">🟢 Currently Active Sessions</div>
+        <span class="badge badge-success">{{ active_count }} Live</span>
+    </div>
+    {% if active_sessions %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Faculty</th>
+                    <th>Room</th>
+                    <th>Subject</th>
+                    <th>Course / Branch</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in active_sessions %}
+                <tr>
+                    <td>
+                        <strong>{{ s.faculty.name }}</strong><br>
+                        <small style="color:var(--text-muted)">{{ s.faculty.department }}</small>
+                    </td>
+                    <td><span class="badge badge-blue">Room {{ s.room_number }}</span></td>
+                    <td>{{ s.subject|default:"—" }}</td>
+                    <td>
+                        {{ s.course|default:"" }}
+                        {% if s.year %} | Year {{ s.year }}{% endif %}
+                        {% if s.branch %} | {{ s.branch }}{% endif %}
+                    </td>
+                    <td style="font-variant-numeric:tabular-nums; color:var(--text-secondary)">
+                        {{ s.start_time|time:"H:i" }} – {{ s.end_time|time:"H:i" }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div style="text-align:center; padding:40px; color:var(--text-muted)">
+        <i class="fas fa-calendar-times" style="font-size:2rem; margin-bottom:10px; display:block"></i>
+        No active sessions right now
+    </div>
+    {% endif %}
+</div>
+
+<!-- QUICK LINKS -->
+<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap:16px; margin-top:20px">
+    <a href="{% url 'admin_faculty' %}" class="card" style="text-decoration:none;cursor:pointer;transition:border-color 0.2s"
+       onmouseover="this.style.borderColor='rgba(96,165,250,0.4)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="font-size:1.6rem; margin-bottom:8px">👥</div>
+        <div style="font-weight:600">Manage Faculty</div>
+        <div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px">Add, edit, remove faculty profiles and photos</div>
+    </a>
+    <a href="{% url 'admin_timetable' %}" class="card" style="text-decoration:none;cursor:pointer;transition:border-color 0.2s"
+       onmouseover="this.style.borderColor='rgba(168,85,247,0.4)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="font-size:1.6rem; margin-bottom:8px">📆</div>
+        <div style="font-weight:600">Edit Timetable</div>
+        <div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px">View, filter, add, and delete schedule entries</div>
+    </a>
+    <a href="{% url 'admin_upload' %}" class="card" style="text-decoration:none;cursor:pointer;transition:border-color 0.2s"
+       onmouseover="this.style.borderColor='rgba(34,197,94,0.4)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="font-size:1.6rem; margin-bottom:8px">📁</div>
+        <div style="font-weight:600">Bulk Upload</div>
+        <div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px">Upload Excel file to replace/update timetable data</div>
+    </a>
+    <a href="/api/timetable/export/" class="card" style="text-decoration:none;cursor:pointer;transition:border-color 0.2s"
+       onmouseover="this.style.borderColor='rgba(245,158,11,0.4)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="font-size:1.6rem; margin-bottom:8px">⬇️</div>
+        <div style="font-weight:600">Export Data</div>
+        <div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px">Download full timetable as CSV</div>
+    </a>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Auto-refresh stats every 60 seconds
+setInterval(() => {
+    fetch('/api/stats/').then(r => r.json()).then(d => {
+        document.querySelectorAll('.stat-value')[3].textContent = d.active_sessions;
+    });
+}, 60000);
+</script>
+{% endblock %}
