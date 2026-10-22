@@ -10,6 +10,9 @@ const smartTrackerAdminUrl = new URL(
   process.env.NEXT_PUBLIC_SMARTTRACKER_URL || "http://localhost:8000",
 ).toString();
 
+const campusSolveAiUrl = "https://campus-solve-ai.vercel.app/";
+const seatifyUrl = "https://seatify-hk5g.vercel.app/";
+
 const navItems = [
   { href: "/", label: "Home" },
   { href: "/campus?mode=explore", label: "Explore Campus" },
@@ -77,6 +80,22 @@ export function Header() {
           <a href={smartTrackerAdminUrl} className="neo-nav-link">
             Admin Panel
           </a>
+          <a
+            href={campusSolveAiUrl}
+            className="neo-nav-link"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Campus Solve AI
+          </a>
+          <a
+            href={seatifyUrl}
+            className="neo-nav-link"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Seatify
+          </a>
         </nav>
 
         <div className="neo-actions">
@@ -129,6 +148,24 @@ export function Header() {
             onClick={() => setMobileOpen(false)}
           >
             Admin Panel
+          </a>
+          <a
+            href={campusSolveAiUrl}
+            className="neo-nav-link"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setMobileOpen(false)}
+          >
+            Campus Solve AI
+          </a>
+          <a
+            href={seatifyUrl}
+            className="neo-nav-link"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setMobileOpen(false)}
+          >
+            Seatify
           </a>
           <Link
             href="/campus?mode=explore"
