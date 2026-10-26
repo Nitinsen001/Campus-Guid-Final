@@ -1,0 +1,255 @@
+{% extends 'admin_panel/base.html' %}
+{% block title %}Timetable — SmartTrack Admin{% endblock %}
+{% block topbar_title %}Timetable Management{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>📆 Timetable Management</h1>
+        <p>View, filter, add, and manage all schedule entries</p>
+    </div>
+    <div style="display:flex;gap:10px">
+        <a href="/api/timetable/export/" class="btn btn-ghost">
+            <i class="fas fa-download"></i> Export CSV
+        </a>
+        <button class="btn btn-primary" onclick="openAddModal()">
+            <i class="fas fa-plus"></i> Add Entry
+        </button>
+    </div>
+</div>
+
+<!-- FILTERS -->
+<div class="card" style="margin-bottom:16px">
+    <form method="get" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
+        <div class="form-group" style="min-width:180px;flex:1">
+            <label>Faculty</label>
+            <select name="faculty">
+                <option value="">All Faculty</option>
+                {% for f in faculties %}
+                <option value="{{ f.id }}" {% if faculty_filter == f.id|stringformat:'s' %}selected{% endif %}>{{ f.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="min-width:140px">
+            <label>Day</label>
+            <select name="day">
+                <option value="">All Days</option>
+                {% for val, name in day_choices %}
+                <option value="{{ val }}" {% if day_filter == val|stringformat:'s' %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="min-width:140px">
+            <label>Room</label>
+            <input type="text" name="room" value="{{ room_filter }}" placeholder="e.g. 101">
+        </div>
+        <button type="submit" class="btn btn-primary" style="align-self:flex-end">
+            <i class="fas fa-filter"></i> Filter
+        </button>
+        <a href="{% url 'admin_timetable' %}" class="btn btn-ghost" style="align-self:flex-end">Clear</a>
+    </form>
+</div>
+
+<!-- TABLE -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Schedule Entries</div>
+        <span class="badge badge-blue">{{ entries|length }} entries</span>
+    </div>
+    <div class="table-wrap">
+        <table id="timetable-table">
+            <thead>
+                <tr>
+                    <th>Faculty</th>
+                    <th>Day</th>
+                    <th>Time</th>
+                    <th>Room</th>
+                    <th>Subject</th>
+                    <th>Course / Year / Sem</th>
+                    <th>Branch</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in entries %}
+                <tr id="row-{{ e.id }}">
+                    <td><strong>{{ e.faculty.name }}</strong></td>
+                    <td><span class="badge badge-purple">{{ e.get_day_of_week_display }}</span></td>
+                    <td style="font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--text-secondary)">
+                        {{ e.start_time|time:"H:i" }} – {{ e.end_time|time:"H:i" }}
+                    </td>
+                    <td><span class="badge badge-blue">{{ e.room_number }}</span></td>
+                    <td>{{ e.subject|default:"—" }}</td>
+                    <td>{{ e.course|default:"" }}{% if e.year %} / {{ e.year }}{% endif %}{% if e.semester %} / {{ e.semester }}{% endif %}</td>
+                    <td>{{ e.branch|default:"—" }}</td>
+                    <td>
+                        <div style="display:flex;gap:6px">
+                            <button class="btn btn-ghost btn-sm btn-icon" onclick="editEntry({{ e.id }})" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-danger btn-sm btn-icon" onclick="deleteEntry({{ e.id }})" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">
+                    No entries found. <a href="{% url 'admin_upload' %}">Upload a timetable</a> or add entries manually.
+                </td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ADD/EDIT MODAL -->
+<div class="modal-overlay" id="entry-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title" id="entry-modal-title">Add Timetable Entry</div>
+            <button class="modal-close" onclick="closeEntryModal()">✕</button>
+        </div>
+        <form id="entry-form">
+            {% csrf_token %}
+            <input type="hidden" id="entry-id" value="">
+            <div class="form-grid" style="margin-bottom:16px">
+                <div class="form-group">
+                    <label>Faculty *</label>
+                    <select id="e-faculty" required>
+                        <option value="">Select Faculty</option>
+                        {% for f in faculties %}
+                        <option value="{{ f.id }}">{{ f.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Day *</label>
+                    <select id="e-day" required>
+                        {% for val, name in day_choices %}
+                        <option value="{{ val }}">{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Start Time *</label>
+                    <input type="time" id="e-start" required>
+                </div>
+                <div class="form-group">
+                    <label>End Time *</label>
+                    <input type="time" id="e-end" required>
+                </div>
+                <div class="form-group">
+                    <label>Room Number *</label>
+                    <input type="text" id="e-room" placeholder="e.g. 201" required>
+                </div>
+                <div class="form-group">
+                    <label>Subject</label>
+                    <input type="text" id="e-subject" placeholder="Data Structures">
+                </div>
+                <div class="form-group">
+                    <label>Course</label>
+                    <input type="text" id="e-course" placeholder="B.E. / M.Tech">
+                </div>
+                <div class="form-group">
+                    <label>Year</label>
+                    <input type="text" id="e-year" placeholder="1st / 2nd / 3rd">
+                </div>
+                <div class="form-group">
+                    <label>Semester</label>
+                    <input type="text" id="e-semester" placeholder="III">
+                </div>
+                <div class="form-group">
+                    <label>Branch</label>
+                    <input type="text" id="e-branch" placeholder="CSE / IT / ECE">
+                </div>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end">
+                <button type="button" class="btn btn-ghost" onclick="closeEntryModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Save Entry
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function openAddModal() {
+    document.getElementById('entry-modal-title').textContent = 'Add Timetable Entry';
+    document.getElementById('entry-id').value = '';
+    document.getElementById('entry-form').reset();
+    document.getElementById('entry-modal').classList.add('open');
+}
+function closeEntryModal() {
+    document.getElementById('entry-modal').classList.remove('open');
+}
+
+async function editEntry(id) {
+    const res = await fetch(`/api/timetable/${id}/`);
+    const e = await res.json();
+    document.getElementById('entry-modal-title').textContent = 'Edit Timetable Entry';
+    document.getElementById('entry-id').value = e.id;
+    document.getElementById('e-faculty').value = e.faculty;
+    document.getElementById('e-day').value = e.day_of_week;
+    document.getElementById('e-start').value = e.start_time;
+    document.getElementById('e-end').value = e.end_time;
+    document.getElementById('e-room').value = e.room_number;
+    document.getElementById('e-subject').value = e.subject || '';
+    document.getElementById('e-course').value = e.course || '';
+    document.getElementById('e-year').value = e.year || '';
+    document.getElementById('e-semester').value = e.semester || '';
+    document.getElementById('e-branch').value = e.branch || '';
+    document.getElementById('entry-modal').classList.add('open');
+}
+
+document.getElementById('entry-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('entry-id').value;
+    const data = {
+        faculty: parseInt(document.getElementById('e-faculty').value),
+        day_of_week: parseInt(document.getElementById('e-day').value),
+        start_time: document.getElementById('e-start').value,
+        end_time: document.getElementById('e-end').value,
+        room_number: document.getElementById('e-room').value,
+        subject: document.getElementById('e-subject').value,
+        course: document.getElementById('e-course').value,
+        year: document.getElementById('e-year').value,
+        semester: document.getElementById('e-semester').value,
+        branch: document.getElementById('e-branch').value,
+    };
+    const url = id ? `/api/timetable/${id}/` : '/api/timetable/';
+    const method = id ? 'PUT' : 'POST';
+    const res = await fetch(url, {
+        method,
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+        body: JSON.stringify(data),
+    });
+    if (res.ok) {
+        showToast(id ? 'Entry updated!' : 'Entry added!', 'success');
+        closeEntryModal();
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        const err = await res.json();
+        const msg = err.non_field_errors?.[0] || JSON.stringify(err);
+        showToast('Error: ' + msg, 'error', 6000);
+    }
+});
+
+async function deleteEntry(id) {
+    if (!confirm('Delete this timetable entry?')) return;
+    const res = await fetch(`/api/timetable/${id}/`, {
+        method: 'DELETE',
+        headers: {'X-CSRFToken': getCookie('csrftoken')}
+    });
+    if (res.status === 204) {
+        document.getElementById(`row-${id}`).remove();
+        showToast('Entry deleted', 'info');
+    } else {
+        showToast('Failed to delete', 'error');
+    }
+}
+</script>
+{% endblock %}

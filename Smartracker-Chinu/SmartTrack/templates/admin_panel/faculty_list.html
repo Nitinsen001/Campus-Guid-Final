@@ -1,0 +1,221 @@
+{% extends 'admin_panel/base.html' %}
+{% block title %}Faculty Directory — SmartTrack Admin{% endblock %}
+{% block topbar_title %}Faculty Directory{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>👥 Faculty Directory</h1>
+        <p>Manage faculty profiles, photos, and qualifications</p>
+    </div>
+    <button class="btn btn-primary" onclick="openModal('add')">
+        <i class="fas fa-plus"></i> Add Faculty
+    </button>
+</div>
+
+<!-- FACULTY GRID -->
+<div id="faculty-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px">
+{% for f in faculties %}
+<div class="card faculty-card" id="fcard-{{ f.id }}">
+    <div style="display:flex; align-items:center; gap:14px; margin-bottom:14px">
+        <div style="position:relative">
+            <img src="{% if f.photo %}{{ f.photo.url }}{% else %}https://ui-avatars.com/api/?name={{ f.name|urlencode }}&background=1e40af&color=ffffff&size=56{% endif %}" alt="{{ f.name }}"
+                 style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid var(--border)"
+                 onerror="this.src='https://ui-avatars.com/api/?name={{ f.name|urlencode }}&background=1e40af&color=ffffff&size=56'">
+        </div>
+        <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:0.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                {{ f.name }}</div>
+            <div style="font-size:0.77rem;color:var(--text-muted)">{{ f.designation }}</div>
+            <span class="badge badge-blue" style="margin-top:4px">{{ f.department|default:"—" }}</span>
+        </div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:5px; font-size:0.8rem; color:var(--text-secondary); margin-bottom:14px">
+        <div><i class="fas fa-graduation-cap" style="width:16px;color:var(--text-muted)"></i> {{ f.qualification|default:"Not specified" }}</div>
+        <div><i class="fas fa-star" style="width:16px;color:var(--text-muted)"></i> {{ f.specialization|default:"Not specified" }}</div>
+        <div><i class="fas fa-door-open" style="width:16px;color:var(--text-muted)"></i> Cabin: {{ f.cabin_number|default:"—" }}</div>
+        <div><i class="fas fa-phone" style="width:16px;color:var(--text-muted)"></i> {{ f.contact|default:"Not provided" }}</div>
+    </div>
+    <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" style="flex:1" onclick="editFaculty({{ f.id }})">
+            <i class="fas fa-edit"></i> Edit
+        </button>
+        <button class="btn btn-danger btn-sm btn-icon" onclick="deleteFaculty({{ f.id }}, '{{ f.name }}')" title="Delete">
+            <i class="fas fa-trash"></i>
+        </button>
+    </div>
+</div>
+{% empty %}
+<div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text-muted)">
+    <i class="fas fa-users" style="font-size:2.5rem;margin-bottom:12px;display:block"></i>
+    No faculty yet. Click "Add Faculty" to get started.
+</div>
+{% endfor %}
+</div>
+
+<!-- ADD / EDIT MODAL -->
+<div class="modal-overlay" id="faculty-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title" id="modal-title">Add Faculty</div>
+            <button class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <form id="faculty-form" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" id="faculty-id" value="">
+            <div class="form-grid" style="margin-bottom:16px">
+                <div class="form-group">
+                    <label>Full Name *</label>
+                    <input type="text" id="f-name" placeholder="Dr. Rajesh Kumar" required>
+                </div>
+                <div class="form-group">
+                    <label>Designation</label>
+                    <input type="text" id="f-designation" placeholder="Professor">
+                </div>
+                <div class="form-group">
+                    <label>Department</label>
+                    <input type="text" id="f-department" placeholder="Computer Science">
+                </div>
+                <div class="form-group">
+                    <label>Qualification</label>
+                    <input type="text" id="f-qualification" placeholder="Ph.D. Computer Science">
+                </div>
+                <div class="form-group">
+                    <label>Specialization</label>
+                    <input type="text" id="f-specialization" placeholder="Machine Learning, AI">
+                </div>
+                <div class="form-group">
+                    <label>Cabin Number</label>
+                    <input type="text" id="f-cabin" placeholder="C-102">
+                </div>
+                <div class="form-group">
+                    <label>Contact</label>
+                    <input type="text" id="f-contact" placeholder="+91 9876543210">
+                </div>
+                <div class="form-group">
+                    <label>Photo</label>
+                    <input type="file" id="f-photo" accept="image/*">
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:16px">
+                <label>Bio</label>
+                <textarea id="f-bio" placeholder="Brief biography…"></textarea>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end">
+                <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="submit-btn">
+                    <i class="fas fa-save"></i> Save Faculty
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- DELETE CONFIRM MODAL -->
+<div class="modal-overlay" id="delete-modal">
+    <div class="modal" style="max-width:400px">
+        <div class="modal-header">
+            <div class="modal-title">⚠️ Confirm Delete</div>
+            <button class="modal-close" onclick="closeDeleteModal()">✕</button>
+        </div>
+        <p style="color:var(--text-secondary);margin-bottom:20px">
+            Are you sure you want to delete <strong id="delete-name"></strong>? This will also delete all their timetable entries.
+        </p>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="btn btn-ghost" onclick="closeDeleteModal()">Cancel</button>
+            <button class="btn btn-danger" id="confirm-delete-btn">
+                <i class="fas fa-trash"></i> Delete
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function openModal(mode) {
+    document.getElementById('faculty-modal').classList.add('open');
+    if (mode === 'add') {
+        document.getElementById('modal-title').textContent = 'Add Faculty';
+        document.getElementById('faculty-id').value = '';
+        document.getElementById('faculty-form').reset();
+    }
+}
+function closeModal() {
+    document.getElementById('faculty-modal').classList.remove('open');
+}
+function closeDeleteModal() {
+    document.getElementById('delete-modal').classList.remove('open');
+}
+
+async function editFaculty(id) {
+    const res = await fetch(`/api/faculty/${id}/`);
+    const f = await res.json();
+    document.getElementById('modal-title').textContent = 'Edit Faculty';
+    document.getElementById('faculty-id').value = f.id;
+    document.getElementById('f-name').value = f.name || '';
+    document.getElementById('f-designation').value = f.designation || '';
+    document.getElementById('f-department').value = f.department || '';
+    document.getElementById('f-qualification').value = f.qualification || '';
+    document.getElementById('f-specialization').value = f.specialization || '';
+    document.getElementById('f-cabin').value = f.cabin_number || '';
+    document.getElementById('f-contact').value = f.contact || '';
+    document.getElementById('f-bio').value = f.bio || '';
+    document.getElementById('faculty-modal').classList.add('open');
+}
+
+document.getElementById('faculty-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('faculty-id').value;
+    const fd = new FormData();
+    fd.append('name', document.getElementById('f-name').value);
+    fd.append('designation', document.getElementById('f-designation').value);
+    fd.append('department', document.getElementById('f-department').value);
+    fd.append('qualification', document.getElementById('f-qualification').value);
+    fd.append('specialization', document.getElementById('f-specialization').value);
+    fd.append('cabin_number', document.getElementById('f-cabin').value);
+    fd.append('contact', document.getElementById('f-contact').value);
+    fd.append('bio', document.getElementById('f-bio').value);
+    const photoFile = document.getElementById('f-photo').files[0];
+    if (photoFile) fd.append('photo', photoFile);
+
+    const url = id ? `/api/faculty/${id}/` : '/api/faculty/';
+    const method = id ? 'PUT' : 'POST';
+
+    const res = await fetch(url, {
+        method,
+        headers: {'X-CSRFToken': getCookie('csrftoken')},
+        body: fd,
+    });
+    if (res.ok) {
+        showToast(id ? 'Faculty updated!' : 'Faculty added!', 'success');
+        closeModal();
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        const err = await res.json();
+        showToast('Error: ' + JSON.stringify(err), 'error', 5000);
+    }
+});
+
+let pendingDeleteId = null;
+function deleteFaculty(id, name) {
+    pendingDeleteId = id;
+    document.getElementById('delete-name').textContent = name;
+    document.getElementById('delete-modal').classList.add('open');
+}
+document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+    if (!pendingDeleteId) return;
+    const res = await fetch(`/api/faculty/${pendingDeleteId}/`, {
+        method: 'DELETE',
+        headers: {'X-CSRFToken': getCookie('csrftoken')}
+    });
+    if (res.status === 204) {
+        showToast('Faculty deleted', 'info');
+        document.getElementById(`fcard-${pendingDeleteId}`).remove();
+        closeDeleteModal();
+    } else {
+        showToast('Failed to delete', 'error');
+    }
+});
+</script>
+{% endblock %}

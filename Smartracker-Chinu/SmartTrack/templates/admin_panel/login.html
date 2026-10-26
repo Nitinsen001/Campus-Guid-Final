@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login — SmartTrack</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root { --accent:#ffe600; }
+        *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+        body {
+            font-family:'Inter',sans-serif; min-height:100vh;
+            background: #dff4ff;
+            display:flex; align-items:center; justify-content:center;
+            color:#0a0a0a;
+        }
+        .login-card {
+            background: #ffffff;
+            border:4px solid #000000;
+            border-radius:0; padding:40px;
+            width:100%; max-width:420px;
+            box-shadow:8px 8px 0 #000000;
+        }
+        .logo { text-align:center; margin-bottom:32px; }
+        .logo-icon {
+            font-size:2.5rem; margin-bottom:8px;
+            display:block;
+        }
+        .logo h1 {
+            font-size:1.4rem; font-weight:800;
+            color:#0a0a0a;
+        }
+        .logo p { font-size:0.82rem; color:#484848; margin-top:4px; }
+
+        .form-group { margin-bottom:16px; }
+        label { display:block; font-size:0.78rem; font-weight:700; color:#303030; margin-bottom:6px; }
+        input {
+            width:100%; background:#ffffff; border:2px solid #000000;
+            border-radius:0; color:#0a0a0a; padding:12px 16px;
+            font-size:0.9rem; font-family:'Inter',sans-serif; outline:none;
+            transition:border-color 0.2s;
+        }
+        input:focus { border-color:#4ecdc4; box-shadow:3px 3px 0 #000000; }
+        input::placeholder { color:#707070; }
+        .btn-login {
+            width:100%; background:#ffe600;
+            color:#000; border:2px solid #000; border-radius:0; padding:13px;
+            box-shadow:4px 4px 0 #000;
+            font-size:0.9rem; font-weight:700; cursor:pointer;
+            font-family:'Inter',sans-serif; transition:opacity 0.2s, transform 0.1s;
+            margin-top:4px;
+        }
+        .btn-login:hover { background:#ffef66; }
+        .btn-login:active { transform:scale(0.98); }
+        .error-msg {
+            background:#ffe4ec; color:#881337;
+            border:2px solid #000;
+            border-radius:0; padding:10px 14px;
+            font-size:0.83rem; margin-bottom:16px;
+            display:flex; align-items:center; gap:8px;
+        }
+        .hint {
+            text-align:center; margin-top:20px;
+            font-size:0.77rem; color:#484848;
+        }
+        .hint a { display:inline-block; margin-top:12px; color:#000; font-weight:800; }
+    </style>
+</head>
+<body>
+<div class="login-card">
+    <div class="logo">
+        <span class="logo-icon">⚡</span>
+        <h1>SmartTrack Admin</h1>
+        <p>Faculty Locator Management Panel</p>
+    </div>
+
+    {% if messages %}
+    {% for msg in messages %}
+    <div class="error-msg">⚠️ {{ msg }}</div>
+    {% endfor %}
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label>Username</label>
+            <input type="text" name="username" placeholder="admin" required autofocus>
+        </div>
+        <div class="form-group">
+            <label>Password</label>
+            <input type="password" name="password" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn-login">Sign In to Admin Panel</button>
+    </form>
+
+    <div class="hint">
+        Must be a Django staff user.<br>
+        <a href="{{ campus_home_url }}">← Back to 3D Campus View</a>
+    </div>
+</div>
+</body>
+</html>
